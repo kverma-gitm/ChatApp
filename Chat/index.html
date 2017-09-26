@@ -1,0 +1,170 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Chat Room</title>
+    <div id="headbuttons" style="display: none;">
+    <button id="clear" text-align="center" style=" margin-left: 85%; cursor: pointer; border-radius: 12px; color: white;background-color: #4CAF50;font-size: 90%;padding: 1%;position: fixed;">Clear Chat</a></button>
+    <button id="logout" text-align="center" style="margin-left: 93%;cursor: pointer; border-radius: 12px; color: white;background-color: #4CAF50;font-size: 90%;padding: 1%;position: fixed; ">Logout</a></button>
+  </div>
+  </div>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body {  font: 13px Helvetica, Arial; }
+      form { background: #000; padding: 3px; position: fixed; bottom: 0; width: 100%; }
+      form input { border: 0; padding: 10px; width: 90%; margin-right: .5%; }
+      form button { width: 9%; background: rgb(130, 224, 255); border: none; padding: 10px; }
+      #messages { list-style-type: none; margin: 0; padding: 0; }
+      #messages li { padding: 5px 10px; }
+      #messages li:nth-child(odd) { background: #eee; }
+
+    </style>
+  </head>
+  <body >
+
+      <div id="loginbox" style="margin-left: 40% ; margin-top: 10%;">
+
+
+      <!-- Generate error for invalid or empty name -->
+      <div class="col-sm-offset-4 col-sm-4 text-center" id="errorName">
+      </div>
+
+      <div style="color: blue; font-size:120%;margin-left:3%">
+      <h2>Username:</h2> 
+    </div>
+      <input type="text" width="48" id="username" placeholder="Enter Username" name="userName" style="width: 25%;padding: 12px 20px;
+    margin: 8px 0;display: inline-block;border: 1px solid #ccc;border-radius: 4px;box-sizing: border-box;" required=""><br>
+    <div >
+      <button id="login"  text-align="center" type="submit" style="margin-left: 5%; cursor: pointer; border-radius: 12px; color: white;background-color: #4CAF50;font-size: 90%;padding: 2%;" >Login</a></button><br>
+    </div>
+  </div>
+
+
+    <div id="chatbox" style="display: none">
+    <div style="">
+    <ul id="messages" style="padding-top: 4%;padding-bottom: 4%;"></ul>
+    </div>
+    <form action="">
+      <input id="message" autocomplete="off" placeholder="Enter message" />
+      <button id="send button" text-align="center" style=" cursor: pointer;position: relative; border-radius: 12px; color: white;background-color: #2073D2;font-size: 90%;">Send</button>
+    </form>
+  </div>
+    <script src="http://cdn.socket.io/socket.io-1.4.5.js"></script>
+    <script src="http://code.jquery.com/jquery-1.11.1.js"></script>
+    <script>
+      
+      var socket = io();
+      var typeFlag=false;
+
+
+      $('form').submit(function(){
+        socket.emit('chat message', $('#message').val());
+        $('#message').val('');
+        return false;
+      });
+      socket.on('chat message', function(msg){
+        var userName=msg.split(' ');
+        $('#messages').append("<li id='message"+userName[0]+"'>"+msg+"</li>");
+        window.scrollTo(0,document.body.scrollHeight);
+      });
+
+
+      //Typing functionality code
+      //Emit clear typing to Server and Set typeFlag false
+      function notTyping(){
+        typeFlag=false;
+        socket.emit('clear typing');
+      }
+
+      socket.on('typing', function(msg){
+        var userName=msg.split(' ');
+        $('#messages').append("<li id='typing"+userName[0]+"'>"+msg+"</li>");
+      });
+
+      //Identify if user pressed key
+      $('#message').keydown(function(){
+        //if typing not set true
+        if(typeFlag==false)
+        {
+          typeFlag=true;
+          //Emit to server that user is typing
+          socket.emit('typing');
+          //Set timeout to check after 2 seconds if user is still typing
+          typingTimeout=setTimeout(notTyping,500);
+        }
+        else
+        {
+          //Clear previous timeout
+          clearTimeout(typingTimeout);
+
+          //Set new timeout
+          typingTimeout=setTimeout(notTyping,500);
+        }
+        
+      });
+
+      //Listener to clear users not typing sent from server
+      socket.on('clear user is typing',function(id){
+        
+        id="#typing"+id;
+        $(id).remove();
+      });
+      //End of typing code
+
+      //Login Code
+      $('#login').click(function(){
+        //Check if user entered anything before clicking Login
+        if($('#username').val()=='')
+        {
+          $('#errorName').html('<h4>Please Enter your Name !</h4>');
+        }
+        else
+        {
+          //Emit new user to the server
+          socket.emit('user',$('#username').val());
+             $('#chatbox').show();
+             $('#loginbox').hide();
+             $("#headbuttons").show();
+
+
+          //Loading History
+
+          socket.emit('load-history',$('#username').val());
+
+          
+        }
+        
+      });
+      //Code to press enter for login
+      $(document).ready(function(){
+      $('#username').keypress(function(e){
+      if(e.keyCode==13)
+      $('#login').click();
+    });
+});
+      //login code end
+
+      //Logout code
+      $('#logout').click(function(){
+        window.location.reload();
+      });
+      //Logout Code End
+
+
+      //Chat History Code
+      //Listener for showing history from server
+      socket.on('show-history', function(historyArray){
+        for(var i in historyArray)
+          $('#messages').append($('<li>').text(historyArray[i].userName+' : '+historyArray[i].userMessage));
+          window.scrollTo(0,document.body.scrollHeight);
+      }); 
+
+      //Clear Chat History
+      $('#clear').click(function(){
+        socket.emit('clear chat');
+        $("#messages").empty();
+        $('#messages').append("History Deleted");
+      });
+
+    </script>
+  </body>
+</html>
